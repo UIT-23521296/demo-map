@@ -19,7 +19,7 @@ def get_proof():
     resp = requests.post(f"{RC_URL}/get_proof", json={"tx": tx}, timeout=2)
     rc_data = resp.json()                      # {"proof": [...], "merkle_root": "...."}
 
-    # Kèm thêm zk_proof (tuỳ bạn có cần hay không)
+    # zk_proof 
     tx_dict = json.loads(tx)         # ✅ chuyển string → dict
     tx_id   = tx_dict["tx_id"]       # ✅ lấy tx_id từ dict
     zk_proof    = generate_zk_proof(tx_id, rc_data["merkle_root"])

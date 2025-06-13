@@ -30,9 +30,7 @@ demo-map/
 │   └── sc_server.py
 ├── README.md
 ├── client_demo.py
-├── main.py
-├── rc_to_dc.py
-├── sc_to_rc.py
+├── run_server.py
 ├── source_dump.txt
 └── zk_simulator.py
 ```
@@ -67,21 +65,23 @@ rc_res = requests.post("http://localhost:5002/relay_tx", json={
     "tx_hash"      : hash_data(tx_id),
     "tx_hash_mkl"  : hash_data(tx),
     "proof"        : pr["proof"],
-    "merkle_root"  : pr["merkle_root"],
     "zk_proof"     : pr["zk_proof"]
 }).json()
 print("RC accept?", rc_res["accepted"])
 
 # 5. RC đóng block
-requests.get("http://localhost:5002/get_block")
+res = requests.get("http://localhost:5002/get_block")
+data = res.json()
+tx = data["tx"][0]
+block = data["block"]
 
 pr_rc_dc = requests.post("http://localhost:5005/get_proof", json={"tx":tx, "merkle_root": block["merkle_root"]}).json()
 
 # 6. Gửi ctx sang DC
-rc_res = requests.post("http://localhost:5003/receive_tx", json={
+rc_res = requests.post("http://localhost:5003/receive_ctx", json={
     "tx"           : tx,
-    "tx_hash"      : hash_data(tx_id),
-    "tx_hash_mkl"  : hash_data(tx),
+    "tx_hash_id"      : hash_data(tx_id),
+    "tx_hash"  : hash_data(tx),
     "proof"        : pr_rc_dc["proof"],
     "merkle_root"  : pr_rc_dc["merkle_root"],
     "zk_proof"     : pr_rc_dc["zk_proof"]
@@ -94,124 +94,26 @@ print("DC block:", json.dumps(blk, indent=2))
 
 ```
 
-### main.py
+### run_server.py
 ```py
-from blockchains.source_chain import SourceChain
-from blockchains.destination_chain import DestinationChain
-from relay_chain.relay_chain import RelayChain
-from relay_chain.validator import ValidatorNode
-from sc_to_rc import SCtoRCProver
-from rc_to_dc import RCtoDCProver
+import subprocess
 
-# Khởi tạo các chuỗi và validator
-sc = SourceChain("chainA")
-dc = DestinationChain("chainB")
-validators = [ValidatorNode(f"v{i}") for i in range(4)]
-rc = RelayChain(validators)
+commands = [
+    ["py", "-3.9", "server/sc_server.py"],
+    ["py", "-3.9", "server/rc_server.py"],
+    ["py", "-3.9", "server/dc_server.py"],
+    ["py", "-3.9", "prover/prover_sc_to_rc.py"],
+    ["py", "-3.9", "prover/prover_rc_to_dc.py"],
+]
 
-# Prover giữa SC và RC
-sc_to_rc = SCtoRCProver(sc, rc)
+procs = [subprocess.Popen(cmd) for cmd in commands]
 
-# Gửi giao dịch từ SC → RC
-tx_id = "tx_001"
-receiver = "chainB"
-result = sc_to_rc.send_transaction({"message": "Send 100 MAP"}, receiver, tx_id)
-
-if result["accepted"]:
-    # Prover giữa RC và DC
-    rc.generate_block()
-    rc_to_dc = RCtoDCProver(rc, dc)
-    rc_to_dc.send_to_destination( {"message": "Send 100 MAP"}, result["tx_hash"], tx_id)
-
-# Đóng block ở DestinationChain
-dc.generate_block()
-
-# In kết quả
-print("\n🔗 SourceChain block:", sc.get_latest_block())
-print("🔁 RelayChain block:", rc.get_latest_block())
-print("✅ DestinationChain block:", dc.get_latest_block())
-
-```
-
-### rc_to_dc.py
-```py
-from zk_simulator import generate_zk_proof
-
-class RCtoDCProver:
-    def __init__(self, relay_chain, destination_chain):
-        self.rc = relay_chain
-        self.dc = destination_chain
-
-    def send_to_destination(self, tx, tx_hash: str, tx_id: str):
-        """
-        1. Lấy block mới nhất trên RC
-        2. Lấy Merkle root và Merkle proof của tx_hash
-        3. Tạo zk proof từ tx_id + merkle_root
-        4. Gửi sang DestinationChain
-        """
-        print("\n📤 [Prover] Sending proof from RC to DC")
-        merkle_root_rc = self.rc.get_merkle_root()
-
-        # Find index of tx_hash (do_hash=True -> hash match)
-        index = None
-        for i, tx in enumerate(self.rc.get_latest_block()["transactions"]):
-            from zk_simulator import hash_data
-            if hash_data(tx) == tx_hash:
-                index = i
-                break
-
-        if index is None:
-            print("❌ Không tìm thấy tx_hash trong RC")
-            return False
-
-        # Prover
-        proof_merkle = self.rc.mt.get_proof(index)
-        tx_hash_id = hash_data(tx_id)
-        proof_zk = generate_zk_proof(tx_id, merkle_root_rc)
-
-        success = self.dc.receive_ctx(tx, tx_hash_id, tx_hash, merkle_root_rc, proof_merkle, proof_zk)
-        print("✅ DestinationChain accepted TX:" if success else "❌ DestinationChain rejected TX")
-        return success
-```
-
-### sc_to_rc.py
-```py
-import json
-from zk_simulator import hash_data, generate_zk_proof
-
-class SCtoRCProver:
-    def __init__(self, source_chain, relay_chain):
-        self.sc = source_chain
-        self.rc = relay_chain
-
-    def send_transaction(self, tx_payload: dict, tx_receiver: str, tx_id: str):
-        """
-        1. Thêm giao dịch vào SC
-        2. Tạo block
-        3. Lấy Merkle proof
-        4. Gửi lên RelayChain
-        """
-        print("\n📤 [Prover] Sending transaction from SC to RC")
-        tx = self.sc.add_transaction(tx_payload, tx_receiver, tx_id)
-        block = self.sc.generate_block()
-        merkle_root = block["merkle_root"]
-        proof = self.sc.get_merkle_proof(tx)
-        
-        #Prover
-        tx_hash = hash_data(tx_id)
-        tx_hash_for_mkl = hash_data(tx)
-        zk_proof = generate_zk_proof(tx_id, merkle_root)
-
-        accepted = self.rc.receive_tx(tx, tx_hash, tx_hash_for_mkl, proof, merkle_root, zk_proof)
-        print("✅ RelayChain accepted TX:" if accepted else "❌ RelayChain rejected TX")
-        return {
-            "tx": tx,
-            "tx_hash": tx_hash_for_mkl,
-            "proof": proof,
-            "merkle_root": merkle_root,
-            "zk_proof": zk_proof,
-            "accepted": accepted
-        }
+try:
+    for p in procs:
+        p.wait()
+except KeyboardInterrupt:
+    for p in procs:
+        p.terminate()
 
 ```
 
@@ -400,6 +302,8 @@ class LightClientRC:
         mt = MerkleTools(hash_type="sha256")
         tx_hash_mkl = hash_data(ctx)
 
+
+        # Verify merkle proof
         mkl_ok = mt.validate_proof(
             merkle_proof,
             tx_hash_mkl,
@@ -409,6 +313,8 @@ class LightClientRC:
         # tx_id nằm trong payload ⇒ lôi ra để tạo tx_hash_id
         tx_id        = json.loads(ctx)["tx_id"]
         tx_hash_id   = hash_data(tx_id)
+
+        # Verify zk proof
         zk_ok        = verify_zk_proof(zk_proof, tx_hash_id, self.merkle_root)
 
         return mkl_ok and zk_ok
@@ -492,16 +398,16 @@ def get_proof():
     tx          = request.json["tx"]           # string transaction
     # Gọi SC-server để lấy proof + root
     resp = requests.post(f"{RC_URL}/get_proof", json={"tx": tx}, timeout=2)
-    sc_data = resp.json()                      # {"proof": [...], "merkle_root": "...."}
+    rc_data = resp.json()                      # {"proof": [...], "merkle_root": "...."}
 
-    # Kèm thêm zk_proof (tuỳ bạn có cần hay không)
+    # zk_proof 
     tx_dict = json.loads(tx)         # ✅ chuyển string → dict
     tx_id   = tx_dict["tx_id"]       # ✅ lấy tx_id từ dict
-    zk_proof    = generate_zk_proof(tx_id, sc_data["merkle_root"])
+    zk_proof    = generate_zk_proof(tx_id, rc_data["merkle_root"])
 
     return jsonify({
-        "proof"      : sc_data["proof"],
-        "merkle_root": sc_data["merkle_root"],
+        "proof"      : rc_data["proof"],
+        "merkle_root": rc_data["merkle_root"],
         "zk_proof"   : zk_proof,
         "tx"         : tx
     })
@@ -526,20 +432,6 @@ app = Flask(__name__)
 
 
 SC_URL = "http://localhost:5001" # địa chỉ Source-Chain server
-
-
-# ---- API: sinh zk proof ------
-@app.route("/prove", methods=["POST"])
-def prove():
-    tx_id = request.json["tx_id"]
-    merkle_root = request.json["merkle_root"]
-    zk_proof = generate_zk_proof(tx_id, merkle_root)
-    tx_hash = hash_data(tx_id)
-    return jsonify({
-        "zk_proof": zk_proof,
-        "tx_hash": tx_hash
-    })
-
 
 # ---- API: lấy Merkle-proof thông qua SC-server -------
 @app.route("/get_proof", methods=["POST"])
@@ -609,18 +501,18 @@ class RelayChain:
         self.mt = MerkleTools(hash_type="sha256")
         self.consensus = ConsensusEngine(validators)
 
-    def receive_tx(self, tx: str, tx_hash: str, tx_hash_formkl: str, proof: List[Dict], merkle_root: str, zk_proof: str) -> bool:
+    def receive_tx(self, tx: str, tx_hash_formkl: str, proof: List[Dict], merkle_root: str) -> bool:
         # Step 1: verify Merkle proof
-        is_valid_proof = self.mt.validate_proof(proof, tx_hash_formkl, merkle_root)
-        if not is_valid_proof:
-            print("❌ Merkle proof invalid")
-            return False
+        # is_valid_proof = self.mt.validate_proof(proof, tx_hash_formkl, merkle_root)
+        # if not is_valid_proof:
+        #     print("❌ Merkle proof invalid")
+        #     return False
 
-        # Step 2: verify zk proof
-        is_valid_zk = verify_zk_proof(zk_proof, tx_hash, merkle_root)
-        if not is_valid_zk:
-            print("❌ zk proof invalid")
-            return False
+        # # Step 2: verify zk proof
+        # is_valid_zk = verify_zk_proof(zk_proof, tx_hash, merkle_root)
+        # if not is_valid_zk:
+        #     print("❌ zk proof invalid")
+        #     return False
 
         # Step 3: BFT Consensus
         approved = self.consensus.commit_tx(tx_hash_formkl, proof, merkle_root)
@@ -720,7 +612,7 @@ def receive_ctx():
         tx=data["tx"],
         tx_hash_id=data["tx_hash_id"],
         tx_hash=data["tx_hash"],
-        merkle_root_rc=data["merkle_root"],
+        merkle_root_rc= lc_rc.merkle_root,
         proof_merkle=data["proof"],
         proof_zk=data["zk_proof"]
     )
@@ -816,11 +708,9 @@ def relay_tx():
     # 2. chuyển qua lớp consensus của RC
     accepted = rc.receive_tx(
         tx              = d["tx"],
-        tx_hash         = d["tx_hash"],
         tx_hash_formkl  = d["tx_hash_mkl"],
         proof           = d["proof"],
         merkle_root     = lc_sc.merkle_root,
-        zk_proof        = d["zk_proof"]
     )
     return jsonify({"accepted": accepted})
 
