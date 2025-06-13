@@ -4,7 +4,8 @@ from merkletools import MerkleTools
 import hashlib
 from relay_chain.validator import ValidatorNode
 from relay_chain.consensus import ConsensusEngine
-from zk_simulator import verify_zk_proof
+from zk_simulator import *
+from merkletools import MerkleTools
 
 class RelayChain:
     def __init__(self, validators: List[ValidatorNode]):
@@ -60,3 +61,20 @@ class RelayChain:
     def get_merkle_root(self):
         block = self.get_latest_block()
         return block["merkle_root"] if block else None
+    
+    def get_merkle_proof(self, tx: str):
+        block = self.get_latest_block()
+        if not block:
+            return None
+
+        self.mt.reset_tree()
+        for t in block["transactions"]:
+            self.mt.add_leaf(t, do_hash=True)
+        self.mt.make_tree()
+
+        try:
+            index = block["transactions"].index(tx)
+        except ValueError:
+            return None
+
+        return self.mt.get_proof(index)

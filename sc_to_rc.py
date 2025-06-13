@@ -6,7 +6,7 @@ class SCtoRCProver:
         self.sc = source_chain
         self.rc = relay_chain
 
-    def send_transaction(self, tx_payload: dict, tx_id: str):
+    def send_transaction(self, tx_payload: dict, tx_receiver: str, tx_id: str):
         """
         1. Thêm giao dịch vào SC
         2. Tạo block
@@ -14,7 +14,7 @@ class SCtoRCProver:
         4. Gửi lên RelayChain
         """
         print("\n📤 [Prover] Sending transaction from SC to RC")
-        tx = self.sc.add_transaction(tx_payload)
+        tx = self.sc.add_transaction(tx_payload, tx_receiver, tx_id)
         block = self.sc.generate_block()
         merkle_root = block["merkle_root"]
         proof = self.sc.get_merkle_proof(tx)

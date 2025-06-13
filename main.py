@@ -16,7 +16,8 @@ sc_to_rc = SCtoRCProver(sc, rc)
 
 # Gửi giao dịch từ SC → RC
 tx_id = "tx_001"
-result = sc_to_rc.send_transaction({"message": "Send 100 MAP"}, tx_id)
+receiver = "chainB"
+result = sc_to_rc.send_transaction({"message": "Send 100 MAP"}, receiver, tx_id)
 
 if result["accepted"]:
     # Prover giữa RC và DC

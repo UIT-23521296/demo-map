@@ -11,9 +11,11 @@ class SourceChain:
         self.block_height = 0
         self.mt = MerkleTools(hash_type="sha256")
 
-    def add_transaction(self, payload: Dict) -> str:
+    def add_transaction(self, payload: Dict, tx_receiver: str, tx_id: str) -> str:
         tx = {
+            "tx_id": tx_id,
             "chain_id": self.chain_id,
+            "receiver": tx_receiver,
             "payload": payload
         }
         tx_str = json.dumps(tx, sort_keys=True)
