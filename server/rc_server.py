@@ -70,11 +70,9 @@ def relay_tx():
     # 2. chuyển qua lớp consensus của RC
     accepted = rc.receive_tx(
         tx              = d["tx"],
-        tx_hash         = d["tx_hash"],
         tx_hash_formkl  = d["tx_hash_mkl"],
         proof           = d["proof"],
         merkle_root     = lc_sc.merkle_root,
-        zk_proof        = d["zk_proof"]
     )
     return jsonify({"accepted": accepted})
 

@@ -12,20 +12,6 @@ app = Flask(__name__)
 
 SC_URL = "http://localhost:5001" # địa chỉ Source-Chain server
 
-
-# ---- API: sinh zk proof ------
-@app.route("/prove", methods=["POST"])
-def prove():
-    tx_id = request.json["tx_id"]
-    merkle_root = request.json["merkle_root"]
-    zk_proof = generate_zk_proof(tx_id, merkle_root)
-    tx_hash = hash_data(tx_id)
-    return jsonify({
-        "zk_proof": zk_proof,
-        "tx_hash": tx_hash
-    })
-
-
 # ---- API: lấy Merkle-proof thông qua SC-server -------
 @app.route("/get_proof", methods=["POST"])
 def get_proof():

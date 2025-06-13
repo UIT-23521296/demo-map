@@ -15,18 +15,18 @@ class RelayChain:
         self.mt = MerkleTools(hash_type="sha256")
         self.consensus = ConsensusEngine(validators)
 
-    def receive_tx(self, tx: str, tx_hash: str, tx_hash_formkl: str, proof: List[Dict], merkle_root: str, zk_proof: str) -> bool:
+    def receive_tx(self, tx: str, tx_hash_formkl: str, proof: List[Dict], merkle_root: str) -> bool:
         # Step 1: verify Merkle proof
-        is_valid_proof = self.mt.validate_proof(proof, tx_hash_formkl, merkle_root)
-        if not is_valid_proof:
-            print("❌ Merkle proof invalid")
-            return False
+        # is_valid_proof = self.mt.validate_proof(proof, tx_hash_formkl, merkle_root)
+        # if not is_valid_proof:
+        #     print("❌ Merkle proof invalid")
+        #     return False
 
-        # Step 2: verify zk proof
-        is_valid_zk = verify_zk_proof(zk_proof, tx_hash, merkle_root)
-        if not is_valid_zk:
-            print("❌ zk proof invalid")
-            return False
+        # # Step 2: verify zk proof
+        # is_valid_zk = verify_zk_proof(zk_proof, tx_hash, merkle_root)
+        # if not is_valid_zk:
+        #     print("❌ zk proof invalid")
+        #     return False
 
         # Step 3: BFT Consensus
         approved = self.consensus.commit_tx(tx_hash_formkl, proof, merkle_root)

@@ -24,13 +24,15 @@ rc_res = requests.post("http://localhost:5002/relay_tx", json={
     "tx_hash"      : hash_data(tx_id),
     "tx_hash_mkl"  : hash_data(tx),
     "proof"        : pr["proof"],
-    "merkle_root"  : pr["merkle_root"],
     "zk_proof"     : pr["zk_proof"]
 }).json()
 print("RC accept?", rc_res["accepted"])
 
 # 5. RC đóng block
-requests.get("http://localhost:5002/get_block")
+res = requests.get("http://localhost:5002/get_block")
+data = res.json()
+tx = data["tx"][0]
+block = data["block"]
 
 pr_rc_dc = requests.post("http://localhost:5005/get_proof", json={"tx":tx, "merkle_root": block["merkle_root"]}).json()
 

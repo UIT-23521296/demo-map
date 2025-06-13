@@ -37,6 +37,8 @@ class LightClientRC:
         mt = MerkleTools(hash_type="sha256")
         tx_hash_mkl = hash_data(ctx)
 
+
+        # Verify merkle proof
         mkl_ok = mt.validate_proof(
             merkle_proof,
             tx_hash_mkl,
@@ -46,6 +48,8 @@ class LightClientRC:
         # tx_id nằm trong payload ⇒ lôi ra để tạo tx_hash_id
         tx_id        = json.loads(ctx)["tx_id"]
         tx_hash_id   = hash_data(tx_id)
+
+        # Verify zk proof
         zk_ok        = verify_zk_proof(zk_proof, tx_hash_id, self.merkle_root)
 
         return mkl_ok and zk_ok

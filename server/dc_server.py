@@ -17,7 +17,7 @@ def receive_ctx():
         tx=data["tx"],
         tx_hash_id=data["tx_hash_id"],
         tx_hash=data["tx_hash"],
-        merkle_root_rc=data["merkle_root"],
+        merkle_root_rc= lc_rc.merkle_root,
         proof_merkle=data["proof"],
         proof_zk=data["zk_proof"]
     )
