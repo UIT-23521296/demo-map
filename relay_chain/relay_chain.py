@@ -1,0 +1,62 @@
+import json
+from typing import List, Dict
+from merkletools import MerkleTools
+import hashlib
+from relay_chain.validator import ValidatorNode
+from relay_chain.consensus import ConsensusEngine
+from zk_simulator import verify_zk_proof
+
+class RelayChain:
+    def __init__(self, validators: List[ValidatorNode]):
+        self.chain: List[Dict] = []
+        self.pending_tx: List[Dict] = []
+        self.block_height = 0
+        self.mt = MerkleTools(hash_type="sha256")
+        self.consensus = ConsensusEngine(validators)
+
+    def receive_tx(self, tx: str, tx_hash: str, tx_hash_formkl: str, proof: List[Dict], merkle_root: str, zk_proof: str) -> bool:
+        # Step 1: verify Merkle proof
+        is_valid_proof = self.mt.validate_proof(proof, tx_hash_formkl, merkle_root)
+        if not is_valid_proof:
+            print("❌ Merkle proof invalid")
+            return False
+
+        # Step 2: verify zk proof
+        is_valid_zk = verify_zk_proof(zk_proof, tx_hash, merkle_root)
+        if not is_valid_zk:
+            print("❌ zk proof invalid")
+            return False
+
+        # Step 3: BFT Consensus
+        approved = self.consensus.commit_tx(tx_hash_formkl, proof, merkle_root)
+        if approved:
+            self.pending_tx.append(tx)
+            return True
+        print("❌ BFT Consensus invalid")
+        return False
+
+    def generate_block(self):
+        if not self.pending_tx:
+            return None
+
+        self.mt.reset_tree()
+        for tx in self.pending_tx:
+            self.mt.add_leaf(tx, do_hash=True)
+        self.mt.make_tree()
+
+        block = {
+            "height": self.block_height,
+            "merkle_root": self.mt.get_merkle_root(),
+            "transactions": self.pending_tx.copy()
+        }
+        self.chain.append(block)
+        self.block_height += 1
+        self.pending_tx.clear()
+        return block
+
+    def get_latest_block(self):
+        return self.chain[-1] if self.chain else None
+
+    def get_merkle_root(self):
+        block = self.get_latest_block()
+        return block["merkle_root"] if block else None
