@@ -1,4 +1,4 @@
-import sys, os
+import sys, os, json
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from flask import Flask, request, jsonify
@@ -7,29 +7,22 @@ from relay_chain.validator import ValidatorNode
 from zk_simulator import verify_zk_proof
 import requests
 from lightclient.light_client_sc import LightClientSC
+from lightclient.light_client_sc2 import LightClientSC2
 
 app = Flask(__name__)
 validators = [ValidatorNode(f"v{i}") for i in range(4)]
 rc = RelayChain(validators)
 
-# @app.route("/relay_tx", methods=["POST"])
-# def relay_tx():
-#     data = request.json
-#     result = rc.receive_tx(
-#         tx=data["tx"],
-#         tx_hash=data["tx_hash"],
-#         tx_hash_formkl=data["tx_hash_for_mkl"],
-#         proof=data["proof"],
-#         merkle_root=data["merkle_root"],
-#         zk_proof=data["zk_proof"]
-#     )
-#     return jsonify({"accepted": result})
+lc_map = {
+    "chainA": LightClientSC(),
+    "chainB": LightClientSC2()
+}
 
 @app.route("/get_block", methods=["GET"])
 def get_block():
     block = rc.generate_block()
 
-    # Đồng bộ rc LC
+    # Sync header to DC
     header = {
         "height":      block["height"],
         "merkle_root": block["merkle_root"]
@@ -46,33 +39,49 @@ def get_block():
         "block": block
     })
 
-# rc_server.py
-lc_sc = LightClientSC()
-
 @app.route("/sync_header", methods=["POST"])
 def sync_header():
-    header = request.json        # {height, merkle_root, ...}
-    ok = lc_sc.update_header(header)
+    header = request.json
+    chain_id = header.get("chain_id")  
+
+    if not chain_id or chain_id not in lc_map:
+        return jsonify({"updated": False, "error": "missing/invalid chain_id"}), 400
+
+    ok = lc_map[chain_id].update_header(header)
     return jsonify({"updated": ok})
 
 @app.route("/relay_tx", methods=["POST"])
 def relay_tx():
     d = request.json
-    # 1. LC kiểm tra
-    ok = lc_sc.verify_tx(
-        ctx           = d["tx"],
-        merkle_proof  = d["proof"],
-        zk_proof      = d["zk_proof"]
+    tx_raw = d["tx"]
+    if isinstance(tx_raw, str):
+        try:
+            tx = json.loads(tx_raw)
+        except json.JSONDecodeError:
+            return jsonify({"accepted": False, "error": "tx not valid JSON"}), 400
+    else:
+        tx = tx_raw
+    
+    chain_id = tx.get("chain_id")
+    lc = lc_map.get(chain_id)
+    if not lc:
+        return jsonify({"accepted": False, "error": "Unknown chain_id"}), 400
+
+    # 1. Light Client verification
+    ok = lc.verify_tx(
+        ctx          = d["tx"],
+        merkle_proof = d["proof"],
+        zk_proof     = d["zk_proof"]
     )
     if not ok:
-        return jsonify({"accepted": False})
+        return jsonify({"accepted": False, "reason": "light client rejected"})
 
-    # 2. chuyển qua lớp consensus của RC
+    # 2. Consensus RC
     accepted = rc.receive_tx(
-        tx              = d["tx"],
-        tx_hash_formkl  = d["tx_hash_mkl"],
-        proof           = d["proof"],
-        merkle_root     = lc_sc.merkle_root,
+        tx             = d["tx"],
+        tx_hash_formkl = d["tx_hash_mkl"],
+        proof          = d["proof"],
+        merkle_root    = lc.merkle_root
     )
     return jsonify({"accepted": accepted})
 
@@ -85,7 +94,6 @@ def get_proof():
         "proof": proof,
         "merkle_root": root
     })
-
 
 if __name__ == "__main__":
     app.run(port=5002)

@@ -6,7 +6,7 @@ import requests
 from blockchains.source_chain import SourceChain
 
 app = Flask(__name__)
-sc = SourceChain("chainA")
+sc = SourceChain("chainB")
 
 @app.route("/send_tx", methods=["POST"])
 def send_tx():
@@ -49,4 +49,4 @@ def get_proof():
     })
 
 if __name__ == "__main__":
-    app.run(port=5001)
+    app.run(port=5006)

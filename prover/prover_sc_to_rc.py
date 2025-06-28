@@ -10,14 +10,22 @@ from zk_simulator import generate_zk_proof, hash_data
 app = Flask(__name__)
 
 
-SC_URL = "http://localhost:5001" # địa chỉ Source-Chain server
+SC_URLS = {
+    "chainA": "http://localhost:5001",
+    "chainB": "http://localhost:5006"  
+}
 
 # ---- API: lấy Merkle-proof thông qua SC-server -------
 @app.route("/get_proof", methods=["POST"])
 def get_proof():
     tx          = request.json["tx"]           # string transaction
+    tx_dict = json.loads(tx)
+    chain_id = tx_dict["chain_id"]
+
+    if chain_id not in SC_URLS:
+        return jsonify({"error": "Unknown chain_id"}), 400
     # Gọi SC-server để lấy proof + root
-    resp = requests.post(f"{SC_URL}/get_proof", json={"tx": tx}, timeout=2)
+    resp = requests.post(f"{SC_URLS[chain_id]}/get_proof", json={"tx": tx}, timeout=2)
     sc_data = resp.json()                      # {"proof": [...], "merkle_root": "...."}
 
     # Kèm thêm zk_proof (tuỳ bạn có cần hay không)

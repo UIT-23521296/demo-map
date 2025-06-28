@@ -1,5 +1,6 @@
 import hashlib
 import json
+import time
 from typing import List, Dict
 from merkletools import MerkleTools
 
@@ -21,7 +22,11 @@ class SourceChain:
         tx_str = json.dumps(tx, sort_keys=True)
         self.pending_tx.append(tx_str)
         return tx_str
-
+    
+    def _hash_block_header(self, header: Dict) -> str:
+        header_bytes = json.dumps(header, sort_keys=True).encode()
+        return hashlib.sha256(header_bytes).hexdigest()
+    
     def _calculate_merkle_root(self, txs: List[str]) -> str:
         self.mt.reset_tree()
         for tx in txs:
@@ -34,11 +39,23 @@ class SourceChain:
             return None
 
         root = self._calculate_merkle_root(self.pending_tx)
-        block = {
+
+         # 2. Header
+        header = {
             "height": self.block_height,
+            "prev_hash": self.chain[-1]["hash"] if self.chain else "0"*64,
             "merkle_root": root,
+            "timestamp": int(time.time())
+        }
+
+        # 3. Block hash
+        header_hash = self._hash_block_header(header)
+        block = {
+            "header": header,
+            "hash": header_hash,
             "transactions": self.pending_tx.copy()
         }
+
         self.chain.append(block)
         self.block_height += 1
         self.pending_tx.clear()
@@ -66,13 +83,14 @@ class SourceChain:
 
     def get_merkle_root(self):
         block = self.get_latest_block()
-        return block["merkle_root"] if block else None
+        return block["header"]["merkle_root"] if block else None
+
 
     def get_block_header(self):
         block = self.get_latest_block()
         if block:
             return {
-                "height": block["height"],
-                "merkle_root": block["merkle_root"]
+                "height": block["header"]["height"],
+                "merkle_root": block["header"]["merkle_root"]
             }
         return None
