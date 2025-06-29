@@ -28,7 +28,7 @@ def get_proof():
     resp = requests.post(f"{SC_URLS[chain_id]}/get_proof", json={"tx": tx}, timeout=2)
     sc_data = resp.json()                      # {"proof": [...], "merkle_root": "...."}
 
-    # Kèm thêm zk_proof (tuỳ bạn có cần hay không)
+    # Kèm thêm zk_proof
     tx_dict = json.loads(tx)         # ✅ chuyển string → dict
     tx_id   = tx_dict["tx_id"]       # ✅ lấy tx_id từ dict
     zk_proof    = generate_zk_proof(tx_id, sc_data["merkle_root"])

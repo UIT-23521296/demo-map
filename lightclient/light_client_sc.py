@@ -25,7 +25,7 @@ class LightClientSC:
         return False
 
     # ---------- phase “verify proof” ----------
-    def verify_tx(self, ctx: str, merkle_proof: list, zk_proof: str) -> bool:
+    def verify_tx(self, hash_tx_mkl: str, tx_hash_id: str, merkle_proof: list, zk_proof: str) -> bool:
         """
         ctx  : chuỗi tx (đã JSON.dumps)
         merkle_proof : proof kèm theo
@@ -35,17 +35,15 @@ class LightClientSC:
             return False                      # chưa sync header
 
         mt = MerkleTools(hash_type="sha256")
-        tx_hash_mkl = hash_data(ctx)
 
+        #verify mkl
         mkl_ok = mt.validate_proof(
             merkle_proof,
-            tx_hash_mkl,
+            hash_tx_mkl,
             self.merkle_root
         )
 
-        # tx_id nằm trong payload ⇒ lôi ra để tạo tx_hash_id
-        tx_id        = json.loads(ctx)["tx_id"]
-        tx_hash_id   = hash_data(tx_id)
+        #verify zk
         zk_ok        = verify_zk_proof(zk_proof, tx_hash_id, self.merkle_root)
 
         return mkl_ok and zk_ok

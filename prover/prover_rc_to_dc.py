@@ -20,9 +20,15 @@ def get_proof():
     rc_data = resp.json()                      # {"proof": [...], "merkle_root": "...."}
 
     # zk_proof 
-    tx_dict = json.loads(tx)         # ✅ chuyển string → dict
-    tx_id   = tx_dict["tx_id"]       # ✅ lấy tx_id từ dict
-    zk_proof    = generate_zk_proof(tx_id, rc_data["merkle_root"])
+    # zk_proof 
+    if isinstance(tx, str):
+        tx_dict = json.loads(tx)
+    else:
+        tx_dict = tx  
+
+    tx_id = tx_dict["tx_id"]
+    zk_proof = generate_zk_proof(tx_id, rc_data["merkle_root"])
+
 
     return jsonify({
         "proof"      : rc_data["proof"],

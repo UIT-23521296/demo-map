@@ -1,4 +1,4 @@
-import json
+import json, uuid
 from typing import List, Dict
 from merkletools import MerkleTools
 import hashlib
@@ -30,11 +30,18 @@ class RelayChain:
 
         # Step 3: BFT Consensus
         approved = self.consensus.commit_tx(tx_hash_formkl, proof, merkle_root)
-        if approved:
-            self.pending_tx.append(tx)
-            return True
-        print("❌ BFT Consensus invalid")
-        return False
+        if not approved:
+            print("❌ BFT Consensus invalid")
+            return False
+       
+        tx_id = hashlib.sha256(tx.encode()).hexdigest()
+        wrapped_tx = {
+            "tx_id": tx_id,
+            "tx_data": tx  
+        }
+
+        self.pending_tx.append(json.dumps(wrapped_tx))
+        return True
 
     def generate_block(self):
         if not self.pending_tx:

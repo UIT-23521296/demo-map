@@ -1,6 +1,7 @@
 from blockchains.source_chain import SourceChain
-from zk_simulator import verify_zk_proof
+from zk_simulator import verify_zk_proof, hash_data
 from merkletools import MerkleTools
+import json
 
 class DestinationChain(SourceChain):
     def __init__(self, chain_id):
@@ -30,5 +31,13 @@ class DestinationChain(SourceChain):
             print("❌ zk proof invalid")
             return False
 
-        self.pending_tx.append(tx)
+        local_tx_id = hash_data(json.dumps(tx, sort_keys=True))
+
+        # ✅ Gói lại tx để lưu
+        wrapped = {
+            "tx_id": local_tx_id,
+            "tx_data": tx
+        }
+        self.pending_tx.append(json.dumps(wrapped, sort_keys=True))
+        print("✅ DC accepted tx with new ID:", local_tx_id)
         return True

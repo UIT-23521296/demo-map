@@ -53,14 +53,20 @@ def sync_header():
 @app.route("/relay_tx", methods=["POST"])
 def relay_tx():
     d = request.json
-    tx_raw = d["tx"]
-    if isinstance(tx_raw, str):
-        try:
-            tx = json.loads(tx_raw)
-        except json.JSONDecodeError:
-            return jsonify({"accepted": False, "error": "tx not valid JSON"}), 400
-    else:
-        tx = tx_raw
+    tx = d["tx"]
+    receiver = tx["receiver"]
+    payload  = tx["payload"]
+    chain_id = tx.get("chain_id")
+    
+    tx_obj = {
+        "receiver": receiver,
+        "payload": payload
+    }
+
+    if chain_id:                         
+        tx_obj["chain_id"] = chain_id
+
+    tx_str = json.dumps(tx_obj, sort_keys=True)
     
     chain_id = tx.get("chain_id")
     lc = lc_map.get(chain_id)
@@ -69,7 +75,8 @@ def relay_tx():
 
     # 1. Light Client verification
     ok = lc.verify_tx(
-        ctx          = d["tx"],
+        hash_tx_mkl  = d["tx_hash_mkl"],
+        tx_hash_id   = d["tx_hash_id"],
         merkle_proof = d["proof"],
         zk_proof     = d["zk_proof"]
     )
@@ -78,7 +85,7 @@ def relay_tx():
 
     # 2. Consensus RC
     accepted = rc.receive_tx(
-        tx             = d["tx"],
+        tx             = tx_str,
         tx_hash_formkl = d["tx_hash_mkl"],
         proof          = d["proof"],
         merkle_root    = lc.merkle_root
