@@ -24,8 +24,8 @@ def get_block():
 
     # Sync header to DC
     header = {
-        "height":      block["height"],
-        "merkle_root": block["merkle_root"]
+        "height":      block["header"]["height"],
+        "merkle_root": block["header"]["merkle_root"]
     }
 
     try:
@@ -95,12 +95,23 @@ def relay_tx():
 @app.route("/get_proof", methods=["POST"])
 def get_proof():
     tx = request.json.get("tx")
+
+    # Nếu tx là dict thì chuyển thành JSON string
+    if isinstance(tx, dict):
+        tx = json.dumps(tx, sort_keys=True)
+
     proof = rc.get_merkle_proof(tx)
     root = rc.get_merkle_root()
+
+    if proof is None:
+        print("⚠️ Không tìm thấy tx trong block RC:", tx)
+        return jsonify({"error": "tx not found"}), 400
+
     return jsonify({
         "proof": proof,
         "merkle_root": root
     })
+
 
 if __name__ == "__main__":
     app.run(port=5002)

@@ -3,6 +3,8 @@ import json
 import time
 from typing import List, Dict
 from merkletools import MerkleTools
+from relay_chain.consensus import ConsensusEngine
+from relay_chain.validator import ValidatorNode
 
 class SourceChain:
     def __init__(self, chain_id: str):
@@ -10,6 +12,7 @@ class SourceChain:
         self.chain: List[Dict] = []
         self.pending_tx: List[str] = []
         self.block_height = 0
+        self.consensus = ConsensusEngine([ValidatorNode(f"v{i}") for i in range(4)])
         self.mt = MerkleTools(hash_type="sha256")
 
     def add_transaction(self, payload: Dict, tx_receiver: str, tx_id: str) -> str:
@@ -40,11 +43,18 @@ class SourceChain:
 
         root = self._calculate_merkle_root(self.pending_tx)
 
+        approved, agg_sig, pubkeys = self.consensus.commit_tx("block_x", [], root)
+        if not approved:
+            print("❌ Consensus rejected")
+            return None
+
          # 2. Header
         header = {
             "height": self.block_height,
             "prev_hash": self.chain[-1]["hash"] if self.chain else "0"*64,
             "merkle_root": root,
+            "agg_signature": agg_sig,
+            "validator_pubkeys": pubkeys,
             "timestamp": int(time.time())
         }
 

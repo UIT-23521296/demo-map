@@ -1,4 +1,4 @@
-import json, uuid
+import json, time
 from typing import List, Dict
 from merkletools import MerkleTools
 import hashlib
@@ -52,11 +52,23 @@ class RelayChain:
             self.mt.add_leaf(tx, do_hash=True)
         self.mt.make_tree()
 
-        block = {
+        header = {
             "height": self.block_height,
+            "prev_hash": self.chain[-1]["hash"] if self.chain else "0"*64,
             "merkle_root": self.mt.get_merkle_root(),
+            "timestamp": int(time.time()),
+            "validator_pubkeys": [v.get_public_key() for v in self.consensus.validators],
+        }
+
+        header_bytes = json.dumps(header, sort_keys=True).encode()
+        block_hash = hashlib.sha256(header_bytes).hexdigest()
+
+        block = {
+            "header": header,
+            "hash": block_hash,
             "transactions": self.pending_tx.copy()
         }
+
         self.chain.append(block)
         self.block_height += 1
         self.pending_tx.clear()
@@ -67,7 +79,7 @@ class RelayChain:
 
     def get_merkle_root(self):
         block = self.get_latest_block()
-        return block["merkle_root"] if block else None
+        return block["header"]["merkle_root"] if block else None
     
     def get_merkle_proof(self, tx: str):
         block = self.get_latest_block()

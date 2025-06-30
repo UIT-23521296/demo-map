@@ -2,6 +2,8 @@ from blockchains.source_chain import SourceChain
 from zk_simulator import verify_zk_proof, hash_data
 from merkletools import MerkleTools
 import json
+from relay_chain.consensus import ConsensusEngine
+from relay_chain.validator import ValidatorNode
 
 class DestinationChain(SourceChain):
     def __init__(self, chain_id):

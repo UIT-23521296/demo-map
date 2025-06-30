@@ -111,7 +111,7 @@ block = data["block"]
 # ==== Gửi từng ctx sang DC ====
 for tx in txs:
     pr_rc_dc = requests.post("http://localhost:5005/get_proof",
-                             json={"tx": tx, "merkle_root": block["merkle_root"]}).json()
+                             json={"tx": tx, "merkle_root": block["header"]["merkle_root"]}).json()
     
     tx = json.loads(tx)
     tx_id    = tx["tx_id"]        
