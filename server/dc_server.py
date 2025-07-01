@@ -4,6 +4,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from flask import Flask, request, jsonify
 from blockchains.destination_chain import DestinationChain
 from lightclient.light_client_rc import LightClientRC
+from waitress import serve
 
 app = Flask(__name__)
 dc = DestinationChain("chainB")
@@ -35,4 +36,4 @@ def sync_header():
     return jsonify({"updated": ok})
 
 if __name__ == "__main__":
-    app.run(port=5003)
+    serve(app, host="0.0.0.0", port=5003, threaded = True)

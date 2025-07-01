@@ -6,6 +6,7 @@ from flask import Flask, request, jsonify
 import requests
 import json
 from zk_simulator import generate_zk_proof, hash_data
+from waitress import serve
 
 app = Flask(__name__)
 
@@ -40,4 +41,4 @@ def get_proof():
 
 
 if __name__ == "__main__":
-    app.run(port=5005)
+    serve(app, host="0.0.0.0", port=5005)

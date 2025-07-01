@@ -8,6 +8,7 @@ from zk_simulator import verify_zk_proof
 import requests
 from lightclient.light_client_sc import LightClientSC
 from lightclient.light_client_sc2 import LightClientSC2
+from waitress import serve
 
 app = Flask(__name__)
 validators = [ValidatorNode(f"v{i}") for i in range(4)]
@@ -114,4 +115,4 @@ def get_proof():
 
 
 if __name__ == "__main__":
-    app.run(port=5002)
+    serve(app, host="0.0.0.0", port=5002, threaded = True)

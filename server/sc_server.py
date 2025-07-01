@@ -4,6 +4,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from flask import Flask, request, jsonify
 import requests      
 from blockchains.source_chain import SourceChain
+from waitress import serve
 
 app = Flask(__name__)
 sc = SourceChain("chainA")
@@ -49,4 +50,4 @@ def get_proof():
     })
 
 if __name__ == "__main__":
-    app.run(port=5001)
+    serve(app, host="0.0.0.0", port=5001, threaded = True)

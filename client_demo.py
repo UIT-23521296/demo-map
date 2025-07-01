@@ -54,7 +54,8 @@
 # blk = requests.get("http://localhost:5003/get_block").json()
 # print("DC block:", json.dumps(blk, indent=2))
 
-import requests, json, time
+import requests, json
+from datetime import datetime
 from zk_simulator import hash_data
 
 def send_from_sc(port, tx_id, payload, receiver):
